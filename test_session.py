@@ -33,23 +33,23 @@ async def main():
     s = bot.Session(ch, info)
 
     print("== 1. question ==")
-    s.submit("Demande-moi avec AskUserQuestion (francais/anglais) la langue, puis cree hello.txt avec la salutation.")
+    s.submit("Ask me with AskUserQuestion which language to greet in (French/English), then create hello.txt with the greeting.")
     await wait_idle(s)
-    print("hello.txt:", (proj / "hello.txt").read_text() if (proj / "hello.txt").exists() else "ABSENT")
-    print("question posee:", any(e[0] == "QUESTION" for e in ch.log), "| session_id:", info.get("session_id"))
+    print("hello.txt:", (proj / "hello.txt").read_text() if (proj / "hello.txt").exists() else "MISSING")
+    print("question asked:", any(e[0] == "QUESTION" for e in ch.log), "| session_id:", info.get("session_id"))
 
-    print("== 2. plan (aucune ecriture attendue) ==")
+    print("== 2. plan (no write expected) ==")
     ch.log.clear()
-    s.submit("Planifie la creation de plan.txt contenant 'ok'. Ne cree rien avant approbation.", "plan")
+    s.submit("Plan the creation of plan.txt containing 'ok'. Create nothing before approval.", "plan")
     await wait_idle(s)
-    print("plan.txt avant approbation:", "PRESENT (BUG)" if (proj / "plan.txt").exists() else "absent (ok)")
-    print("PlanView poste:", any(e[0] == "VIEW" and e[1] == "PlanView" for e in ch.log), "| pending_plan:", bool(s.pending_plan))
+    print("plan.txt before approval:", "PRESENT (BUG)" if (proj / "plan.txt").exists() else "absent (ok)")
+    print("PlanView posted:", any(e[0] == "VIEW" and e[1] == "PlanView" for e in ch.log), "| pending_plan:", bool(s.pending_plan))
 
-    print("== 3. approbation ==")
-    s.submit("Le plan est approuve : execute-le maintenant.", "bypassPermissions")
+    print("== 3. approval ==")
+    s.submit("The plan is approved: execute it now.", "bypassPermissions")
     await wait_idle(s)
-    print("plan.txt apres approbation:", "present (ok)" if (proj / "plan.txt").exists() else "ABSENT (BUG)")
+    print("plan.txt after approval:", "present (ok)" if (proj / "plan.txt").exists() else "ABSENT (BUG)")
     await s._disconnect()
-    print("== journal =="); [print(" ", e) for e in ch.log]
+    print("== log =="); [print(" ", e) for e in ch.log]
 
 asyncio.run(main())

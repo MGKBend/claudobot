@@ -1,5 +1,5 @@
 [Unit]
-Description=OpenClaw - bot Discord pour Claude Code
+Description=OpenClaw - Discord bot to drive Claude Code
 After=network-online.target
 Wants=network-online.target
 

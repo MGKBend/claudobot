@@ -25,12 +25,12 @@ NO_PING = discord.AllowedMentions.none()
 log = logging.getLogger("openclaw")
 
 APPEND_PROMPT = (
-    "Tu es piloté à distance depuis un salon Discord. Pose toutes tes questions à l'utilisateur "
-    "avec l'outil AskUserQuestion (jamais en texte libre) et réponds de façon concise, en français. "
-    "Le fichier GOALS.md du projet, s'il existe, décrit les objectifs à poursuivre. "
-    "Les fichiers que l'utilisateur joint sur Discord sont enregistrés dans attachments/ du projet. "
-    "Pour lui envoyer le projet en .zip, utilise l'outil mcp__discord__send_project_zip ; pour un fichier seul, "
-    "mcp__discord__send_file. N'inclus les .env (include_env) que si l'utilisateur le demande explicitement."
+    "You are being driven remotely from a Discord channel. Ask the user every question with the "
+    "AskUserQuestion tool (never as free text) and reply concisely, in the language the user writes in. "
+    "The project's GOALS.md file, if it exists, describes the goals to pursue. "
+    "Files the user attaches on Discord are saved in the project's attachments/ folder. "
+    "To send the user the project as a .zip, use the mcp__discord__send_project_zip tool; for a single file, "
+    "use mcp__discord__send_file. Only include .env files (include_env) if the user explicitly asks for them."
 )
 
 
@@ -76,7 +76,7 @@ def usage_block() -> str | None:
     for k, label in WINDOWS.items():
         w = usage.get(k)
         if w and w["utilization"] >= 1.0 and (w.get("resetsAt") or 0) > now:
-            return f"⛔ Limite {label} atteinte — reprise <t:{int(w['resetsAt'])}:R> (<t:{int(w['resetsAt'])}:t>)."
+            return f"⛔ {label} limit reached — resumes <t:{int(w['resetsAt'])}:R> (<t:{int(w['resetsAt'])}:t>)."
     return None
 
 
@@ -94,7 +94,7 @@ async def refresh_presence() -> None:
         status = discord.Status.idle
     else:
         status = discord.Status.online
-    text = usage_line() or "En attente de mesure"
+    text = usage_line() or "Waiting for measurement"
     try:
         await bot.change_presence(status=status, activity=discord.CustomActivity(name=text))
     except Exception:
@@ -115,8 +115,8 @@ async def send_long(channel, text: str):
     if not text:
         return
     if len(text) > 8000:
-        await channel.send("📎 Réponse longue en pièce jointe.", allowed_mentions=NO_PING,
-                           file=discord.File(io.BytesIO(text.encode()), "reponse.md"))
+        await channel.send("📎 Long reply attached.", allowed_mentions=NO_PING,
+                           file=discord.File(io.BytesIO(text.encode()), "reply.md"))
         return
     for part in chunks(text):
         await channel.send(part, allowed_mentions=NO_PING)
@@ -149,11 +149,11 @@ async def save_attachments(msg, project_dir: str) -> tuple[list[str], list[str]]
     saved, refused = [], []
     for a in getattr(msg, "attachments", []):
         if a.size > MAX_ATTACH:
-            refused.append(f"{a.filename} ({a.size / 1e6:.0f} Mo)")
+            refused.append(f"{a.filename} ({a.size / 1e6:.0f} MB)")
             continue
         dest.mkdir(exist_ok=True)
         ensure_gitignored(root, "attachments/")
-        name = restore_dotfile_name(Path(a.filename).name.replace("\x00", "") or "fichier")
+        name = restore_dotfile_name(Path(a.filename).name.replace("\x00", "") or "file")
         target = dest / name
         if target.exists():
             target = dest / f"{int(time.time())}-{name}"
@@ -188,9 +188,9 @@ async def send_file_checked(channel, path: Path, filename: str) -> str:
     size = path.stat().st_size
     limit = upload_limit(channel)
     if size > limit:
-        return f"Fichier trop gros pour Discord ({size / 1e6:.1f} Mo > {limit / 1e6:.0f} Mo)."
+        return f"File too large for Discord ({size / 1e6:.1f} MB > {limit / 1e6:.0f} MB)."
     await channel.send(file=discord.File(path, filename=filename))
-    return f"Envoyé : {filename} ({size / 1e6:.2f} Mo)."
+    return f"Sent: {filename} ({size / 1e6:.2f} MB)."
 
 
 async def send_project_zip(channel, project_dir: str, include_env: bool = False, include_git: bool = False) -> str:
@@ -205,7 +205,7 @@ class AuthView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         ok = authorized(interaction.user.id, interaction.guild_id)
         if not ok:
-            await interaction.response.send_message("⛔ Non autorisé.", ephemeral=True)
+            await interaction.response.send_message("⛔ Not authorized.", ephemeral=True)
         return ok
 
 
@@ -214,7 +214,7 @@ class TextModal(discord.ui.Modal):
         super().__init__(title=title[:45])
         self._cb = on_submit
         self.field = discord.ui.TextInput(
-            label="Ta réponse"[:45], style=discord.TextStyle.paragraph if long else discord.TextStyle.short,
+            label="Your answer"[:45], style=discord.TextStyle.paragraph if long else discord.TextStyle.short,
             max_length=2000)
         self.add_item(self.field)
 
@@ -231,7 +231,7 @@ class QuestionView(AuthView):
         opts = q.get("options", [])
         if self.multi:
             sel = discord.ui.Select(
-                placeholder="Choisis une ou plusieurs options", min_values=1, max_values=len(opts),
+                placeholder="Pick one or more options", min_values=1, max_values=len(opts),
                 options=[discord.SelectOption(label=o["label"][:100], value=o["label"][:100],
                                               description=(o.get("description") or "")[:100] or None) for o in opts])
             sel.callback = self._on_select
@@ -241,7 +241,7 @@ class QuestionView(AuthView):
                 b = discord.ui.Button(label=o["label"][:80], style=discord.ButtonStyle.primary)
                 b.callback = self._make_choice(o["label"])
                 self.add_item(b)
-        other = discord.ui.Button(label="Autre…", style=discord.ButtonStyle.secondary)
+        other = discord.ui.Button(label="Other…", style=discord.ButtonStyle.secondary)
         other.callback = self._on_other
         self.add_item(other)
 
@@ -267,7 +267,7 @@ class QuestionView(AuthView):
             await message.edit(view=self)
             await message.channel.send(f"✅ {text[:1500]}", allowed_mentions=NO_PING)
             self._done(text)
-        await interaction.response.send_modal(TextModal("Autre réponse", got))
+        await interaction.response.send_modal(TextModal("Other answer", got))
 
     async def _finish(self, interaction: discord.Interaction, value):
         for item in self.children:
@@ -283,21 +283,21 @@ class PlanView(AuthView):
         super().__init__(timeout=None)
         self.session = session
 
-    @discord.ui.button(label="Approuver", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="Approve", style=discord.ButtonStyle.success)
     async def approve(self, interaction: discord.Interaction, _):
         await interaction.response.edit_message(view=None)
-        self.session.submit("Le plan est approuvé : exécute-le maintenant.", "bypassPermissions")
+        self.session.submit("The plan is approved: execute it now.", "bypassPermissions")
 
-    @discord.ui.button(label="Modifier", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Edit", style=discord.ButtonStyle.secondary)
     async def amend(self, interaction: discord.Interaction, _):
         async def got(text):
-            self.session.submit(f"Révise le plan avec ces remarques : {text}", "plan")
-        await interaction.response.send_modal(TextModal("Remarques sur le plan", got))
+            self.session.submit(f"Revise the plan with these remarks: {text}", "plan")
+        await interaction.response.send_modal(TextModal("Remarks on the plan", got))
 
-    @discord.ui.button(label="Rejeter", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Reject", style=discord.ButtonStyle.danger)
     async def reject(self, interaction: discord.Interaction, _):
         await interaction.response.edit_message(view=None)
-        await interaction.followup.send("🗑️ Plan rejeté.")
+        await interaction.followup.send("🗑️ Plan rejected.")
 
 
 class Session:
@@ -325,7 +325,7 @@ class Session:
             self.queue.get_nowait()
         for v in self.questions:
             if not v.future.done():
-                v.future.set_result("(question annulée par /stop)")
+                v.future.set_result("(question cancelled by /stop)")
         if self.client and self.busy:
             await self.client.interrupt()
 
@@ -345,19 +345,19 @@ class Session:
 
     def _discord_tools(self):
         @tool("send_project_zip",
-              "Envoie le projet courant en .zip à l'utilisateur dans Discord (exclut .env, .git, node_modules, .venv par défaut).",
+              "Send the current project to the user on Discord as a .zip (excludes .env, .git, node_modules, .venv by default).",
               {"include_env": bool, "include_git": bool})
         async def t_zip(args):
             text = await send_project_zip(self.channel, self.info["dir"], bool(args.get("include_env")),
                                           bool(args.get("include_git")))
             return {"content": [{"type": "text", "text": text}]}
 
-        @tool("send_file", "Envoie un fichier du projet à l'utilisateur dans Discord.", {"path": str})
+        @tool("send_file", "Send a project file to the user on Discord.", {"path": str})
         async def t_file(args):
             root = Path(self.info["dir"]).resolve()
             target = (root / args["path"]).resolve()
             if root not in target.parents or not target.is_file():
-                return {"content": [{"type": "text", "text": "Fichier introuvable dans le projet."}], "is_error": True}
+                return {"content": [{"type": "text", "text": "File not found in the project."}], "is_error": True}
             return {"content": [{"type": "text", "text": await send_file_checked(self.channel, target, target.name)}]}
 
         return create_sdk_mcp_server("discord", tools=[t_zip, t_file])
@@ -392,7 +392,7 @@ class Session:
         if name == "ExitPlanMode":
             self.pending_plan = input_data.get("plan", "")
             return PermissionResultDeny(
-                message="Le plan a été transmis à l'utilisateur sur Discord. Termine ton tour sans rien exécuter.",
+                message="The plan has been sent to the user on Discord. End your turn without executing anything.",
                 interrupt=True)
         return PermissionResultAllow()
 
@@ -405,7 +405,7 @@ class Session:
             except Exception as e:
                 log.exception("turn")
                 await self._disconnect()
-                await self.channel.send(f"❌ Erreur : `{type(e).__name__}: {str(e)[:500]}`")
+                await self.channel.send(f"❌ Error: `{type(e).__name__}: {str(e)[:500]}`")
             finally:
                 self.busy = False
 
@@ -418,10 +418,10 @@ class Session:
         await self.client.set_permission_mode(mode)
         if self.goals_path.exists() and self.goals_path.stat().st_mtime != self.goals_mtime:
             self.goals_mtime = self.goals_path.stat().st_mtime
-            prompt = f"[Objectifs du projet — GOALS.md]\n{self.goals_path.read_text()}\n\n[Demande]\n{prompt}"
+            prompt = f"[Project goals — GOALS.md]\n{self.goals_path.read_text()}\n\n[Request]\n{prompt}"
         if self.files:
             listing = "\n".join(f"- {f}" for f in self.files)
-            prompt = f"[Fichiers reçus de l'utilisateur, chemins relatifs au projet]\n{listing}\n\n{prompt}"
+            prompt = f"[Files received from the user, paths relative to the project]\n{listing}\n\n{prompt}"
             self.files.clear()
         self.pending_plan = None
         last_text, tools = "", []
@@ -449,9 +449,9 @@ class Session:
                 update_usage(m.rate_limit_info)
                 await refresh_presence()
                 if m.rate_limit_info.status == "rejected":
-                    await self.channel.send(usage_block() or "⛔ Limite d'usage atteinte.")
+                    await self.channel.send(usage_block() or "⛔ Usage limit reached.")
                 elif m.rate_limit_info.status == "allowed_warning":
-                    await self.channel.send(f"⚠️ Proche de la limite d'usage ({usage_line()}).")
+                    await self.channel.send(f"⚠️ Close to the usage limit ({usage_line()}).")
             elif isinstance(m, ResultMessage):
                 await flush_tools()
                 if m.session_id:
@@ -459,12 +459,12 @@ class Session:
                     save_state()
                 secs = (m.duration_ms or 0) / 1000
                 cost = f" · ${m.total_cost_usd:.3f}" if m.total_cost_usd else ""
-                await self.channel.send(f"-# ✔ terminé en {secs:.0f}s{cost}")
+                await self.channel.send(f"-# ✔ done in {secs:.0f}s{cost}")
         if self.pending_plan or mode == "plan":
             plan = self.pending_plan or last_text
             if self.pending_plan:
-                await send_long(self.channel, f"📋 **Plan proposé**\n{plan}")
-            await self.channel.send("Que faire de ce plan ?", view=PlanView(self))
+                await send_long(self.channel, f"📋 **Proposed plan**\n{plan}")
+            await self.channel.send("What should we do with this plan?", view=PlanView(self))
 
 
 intents = discord.Intents.default()
@@ -476,7 +476,7 @@ class AuthTree(app_commands.CommandTree):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         ok = authorized(interaction.user.id, interaction.guild_id)
         if not ok:
-            await interaction.response.send_message("⛔ Non autorisé.", ephemeral=True)
+            await interaction.response.send_message("⛔ Not authorized.", ephemeral=True)
         return ok
 
 
@@ -499,36 +499,36 @@ def init_project_dir(path: Path, goal: str | None):
     if not (path / ".git").exists():
         subprocess.run(["git", "init", "-q"], cwd=path, check=False)
     if goal:
-        (path / "GOALS.md").write_text(f"# Objectifs\n\n{goal}\n")
+        (path / "GOALS.md").write_text(f"# Goals\n\n{goal}\n")
 
 
-project = app_commands.Group(name="project", description="Gérer les projets Claude Code")
+project = app_commands.Group(name="project", description="Manage Claude Code projects")
 
 
-@project.command(name="new", description="Crée un projet (dossier + salon)")
-@app_commands.describe(nom="minuscules, chiffres, - et _", objectif="Objectif initial (GOALS.md)")
-async def project_new(interaction: discord.Interaction, nom: str, objectif: str | None = None):
-    if not NAME_RE.match(nom):
-        return await interaction.response.send_message("Nom invalide (a-z, 0-9, -, _).", ephemeral=True)
-    path = ROOT / nom
+@project.command(name="new", description="Create a project (folder + channel)")
+@app_commands.describe(name="lowercase letters, digits, - and _", goal="Initial goal (GOALS.md)")
+async def project_new(interaction: discord.Interaction, name: str, goal: str | None = None):
+    if not NAME_RE.match(name):
+        return await interaction.response.send_message("Invalid name (a-z, 0-9, -, _).", ephemeral=True)
+    path = ROOT / name
     if any(v["dir"] == str(path) for v in state.values()):
-        return await interaction.response.send_message("Ce projet existe déjà.", ephemeral=True)
+        return await interaction.response.send_message("This project already exists.", ephemeral=True)
     await interaction.response.defer()
-    init_project_dir(path, objectif)
+    init_project_dir(path, goal)
     guild = interaction.guild
     cat = discord.utils.get(guild.categories, name=CATEGORY) or await guild.create_category(CATEGORY)
-    ch = await guild.create_text_channel(nom, category=cat, topic=f"Projet Claude Code : {path}")
+    ch = await guild.create_text_channel(name, category=cat, topic=f"Claude Code project: {path}")
     state[str(ch.id)] = {"dir": str(path)}
     save_state()
-    await ch.send(f"🚀 Projet **{nom}** prêt (`{path}`). Écris ici pour parler à Claude.")
-    await interaction.followup.send(f"Salon créé : {ch.mention}")
+    await ch.send(f"🚀 Project **{name}** ready (`{path}`). Write here to talk to Claude.")
+    await interaction.followup.send(f"Channel created: {ch.mention}")
 
 
-@project.command(name="link", description="Rattache ce salon à un dossier sous PROJECTS_ROOT")
-async def project_link(interaction: discord.Interaction, nom: str):
-    path = (ROOT / nom).resolve()
+@project.command(name="link", description="Link this channel to a folder under PROJECTS_ROOT")
+async def project_link(interaction: discord.Interaction, name: str):
+    path = (ROOT / name).resolve()
     if ROOT.resolve() not in path.parents or not path.is_dir():
-        return await interaction.response.send_message("Dossier introuvable sous PROJECTS_ROOT.", ephemeral=True)
+        return await interaction.response.send_message("Folder not found under PROJECTS_ROOT.", ephemeral=True)
     old = sessions.pop(interaction.channel_id, None)
     if old:
         await old.stop()
@@ -536,95 +536,95 @@ async def project_link(interaction: discord.Interaction, nom: str):
         old.worker.cancel()
     state[str(interaction.channel_id)] = {"dir": str(path)}
     save_state()
-    await interaction.response.send_message(f"🔗 Salon lié à `{path}`.")
+    await interaction.response.send_message(f"🔗 Channel linked to `{path}`.")
 
 
-goal = app_commands.Group(name="goal", description="Objectifs du projet (GOALS.md)")
+goal = app_commands.Group(name="goal", description="Project goals (GOALS.md)")
 
 
-@goal.command(name="set", description="Remplace GOALS.md")
-async def goal_set(interaction: discord.Interaction, texte: str):
+@goal.command(name="set", description="Replace GOALS.md")
+async def goal_set(interaction: discord.Interaction, text: str):
     s = session_for(interaction.channel)
     if not s:
-        return await interaction.response.send_message("Salon non lié à un projet.", ephemeral=True)
-    s.goals_path.write_text(f"# Objectifs\n\n{texte}\n")
-    await interaction.response.send_message("🎯 Objectifs mis à jour (injectés au prochain message).")
+        return await interaction.response.send_message("Channel not linked to a project.", ephemeral=True)
+    s.goals_path.write_text(f"# Goals\n\n{text}\n")
+    await interaction.response.send_message("🎯 Goals updated (injected with the next message).")
 
 
-@goal.command(name="show", description="Affiche GOALS.md")
+@goal.command(name="show", description="Show GOALS.md")
 async def goal_show(interaction: discord.Interaction):
     s = session_for(interaction.channel)
     if not s or not s.goals_path.exists():
-        return await interaction.response.send_message("Aucun GOALS.md.", ephemeral=True)
+        return await interaction.response.send_message("No GOALS.md.", ephemeral=True)
     await interaction.response.send_message(s.goals_path.read_text()[:1900])
 
 
-@tree.command(name="plan", description="Claude propose un plan (mode plan) avant d'exécuter")
-async def plan_cmd(interaction: discord.Interaction, demande: str):
+@tree.command(name="plan", description="Claude proposes a plan (plan mode) before executing")
+async def plan_cmd(interaction: discord.Interaction, request: str):
     s = session_for(interaction.channel)
     if not s:
-        return await interaction.response.send_message("Salon non lié à un projet.", ephemeral=True)
-    await interaction.response.send_message(f"📝 Planification : {demande[:1500]}")
-    s.submit(demande, "plan")
+        return await interaction.response.send_message("Channel not linked to a project.", ephemeral=True)
+    await interaction.response.send_message(f"📝 Planning: {request[:1500]}")
+    s.submit(request, "plan")
 
 
-@tree.command(name="zip", description="Envoie le projet en .zip dans le salon")
-@app_commands.describe(avec_env="Inclure les fichiers .env", avec_git="Inclure le dossier .git")
-async def zip_cmd(interaction: discord.Interaction, avec_env: bool = False, avec_git: bool = False):
+@tree.command(name="zip", description="Send the project as a .zip in the channel")
+@app_commands.describe(with_env="Include .env files", with_git="Include the .git folder")
+async def zip_cmd(interaction: discord.Interaction, with_env: bool = False, with_git: bool = False):
     s = session_for(interaction.channel)
     if not s:
-        return await interaction.response.send_message("Salon non lié à un projet.", ephemeral=True)
+        return await interaction.response.send_message("Channel not linked to a project.", ephemeral=True)
     await interaction.response.defer()
-    text = await send_project_zip(interaction.channel, s.info["dir"], avec_env, avec_git)
+    text = await send_project_zip(interaction.channel, s.info["dir"], with_env, with_git)
     await interaction.followup.send(f"📦 {text}")
 
 
-@tree.command(name="stop", description="Interrompt Claude")
+@tree.command(name="stop", description="Interrupt Claude")
 async def stop_cmd(interaction: discord.Interaction):
     s = session_for(interaction.channel)
     if not s:
-        return await interaction.response.send_message("Salon non lié à un projet.", ephemeral=True)
-    await interaction.response.send_message("🛑 Interruption demandée.")
+        return await interaction.response.send_message("Channel not linked to a project.", ephemeral=True)
+    await interaction.response.send_message("🛑 Interruption requested.")
     await s.stop()
 
 
-@tree.command(name="reset", description="Nouvelle session (oublie le contexte)")
+@tree.command(name="reset", description="New session (forget the context)")
 async def reset_cmd(interaction: discord.Interaction):
     s = session_for(interaction.channel)
     if not s:
-        return await interaction.response.send_message("Salon non lié à un projet.", ephemeral=True)
-    await interaction.response.send_message("♻️ Session réinitialisée.")
+        return await interaction.response.send_message("Channel not linked to a project.", ephemeral=True)
+    await interaction.response.send_message("♻️ Session reset.")
     await s.reset()
 
 
-@tree.command(name="status", description="Projets et session Claude Code (modèle, skills, plugins)")
+@tree.command(name="status", description="Projects and Claude Code session (model, skills, plugins)")
 async def status_cmd(interaction: discord.Interaction):
     lines = []
     for cid, info in state.items():
         s = sessions.get(int(cid))
-        line = f"<#{cid}> `{info['dir']}` — {'⚙️ occupé' if s and s.busy else '💤 libre'}"
+        line = f"<#{cid}> `{info['dir']}` — {'⚙️ busy' if s and s.busy else '💤 idle'}"
         if s and s.init:
             i = s.init
             cmds = i.get("slash_commands", [])
             plugins = sorted({c.split(":")[0] for c in cmds if ":" in c})
-            line += (f"\n-# Claude Code {i.get('claude_code_version')} · {i.get('model')} · {len(i.get('tools', []))} outils · "
-                     f"{len(cmds)} commandes/skills · plugins: {', '.join(plugins) or '—'} · "
+            line += (f"\n-# Claude Code {i.get('claude_code_version')} · {i.get('model')} · {len(i.get('tools', []))} tools · "
+                     f"{len(cmds)} commands/skills · plugins: {', '.join(plugins) or '—'} · "
                      f"MCP: {', '.join(m['name'] for m in i.get('mcp_servers', [])) or '—'} · session `{(info.get('session_id') or '')[:8]}`")
         lines.append(line)
-    await interaction.response.send_message("\n".join(lines)[:1900] or "Aucun projet.", allowed_mentions=NO_PING)
+    await interaction.response.send_message("\n".join(lines)[:1900] or "No projects.", allowed_mentions=NO_PING)
 
 
-@tree.command(name="usage", description="Limites d'usage de l'abonnement (5H et 7D)")
+@tree.command(name="usage", description="Subscription usage limits (5H and 7D)")
 async def usage_cmd(interaction: discord.Interaction):
     if not any(k in usage for k in WINDOWS):
-        return await interaction.response.send_message("Pas encore de mesure : envoie d'abord un message à Claude.", ephemeral=True)
+        return await interaction.response.send_message("No measurement yet: send Claude a message first.", ephemeral=True)
     lines = []
     for k, label in WINDOWS.items():
         w = usage.get(k)
         if w:
             reset = f" — reset <t:{int(w['resetsAt'])}:R>" if w.get("resetsAt") else ""
             lines.append(f"**{label}** `{bar(w['utilization'])}` {w['utilization']*100:.0f}%{reset}")
-    lines.append(f"-# mesuré <t:{usage.get('updated', 0)}:R> · état : {usage.get('status', '?')}")
+    lines.append(f"-# measured <t:{usage.get('updated', 0)}:R> · status: {usage.get('status', '?')}")
     await interaction.response.send_message("\n".join(lines))
 
 
@@ -646,8 +646,8 @@ async def on_ready():
         ch = bot.get_channel(int(cid))
         if ch:
             session_for(ch)
-            await ch.send("🟢 OpenClaw en ligne (les questions en attente avant le redémarrage sont perdues).")
-    log.info("prêt : %s", bot.user)
+            await ch.send("🟢 OpenClaw is online (questions pending before the restart are lost).")
+    log.info("ready: %s", bot.user)
 
 
 @bot.event
@@ -663,11 +663,11 @@ async def on_message(msg: discord.Message):
         s.files.extend(saved)
         note = []
         if saved:
-            note.append("📥 Enregistré : " + ", ".join(f"`{f}`" for f in saved))
+            note.append("📥 Saved: " + ", ".join(f"`{f}`" for f in saved))
         if refused:
-            note.append("⚠️ Trop gros, ignoré : " + ", ".join(refused))
+            note.append("⚠️ Too large, ignored: " + ", ".join(refused))
         if not text:
-            note.append("Ils seront transmis à Claude avec ton prochain message.")
+            note.append("They will be passed to Claude with your next message.")
         if note:
             await msg.channel.send("\n".join(note), allowed_mentions=NO_PING)
     if not text:
